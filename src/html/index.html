@@ -2,18 +2,56 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Agent View</title>
+    <title>Network Agent View</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background-color: #eef2f3; padding: 50px; }
-        .box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); display: inline-block; }
-        h1 { color: #2c3e50; }
-        span { color: #e74c3c; font-weight: bold; }
+        /* סגנון לכל העמוד */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            /* איפוס שוליים ברירת מחדל */
+            margin: 0;
+            padding: 0;
+            /* תופס את כל גובה המסך */
+            height: 100vh;
+            /* מרכוז הקופסה במרכז המסך */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            /* --- הגדרות הרקע --- */
+            /* שכבה ראשונה: פילטר כהה חצי שקוף (כדי שהטקסט יהיה קריא) */
+            /* שכבה שניה: התמונה עצמה */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+                              url('bg.jpg'); /* Nginx מחפש את זה באותה תיקייה */
+
+            /* התמונה תכסה את כל המסך בלי עיוות */
+            background-size: cover;
+            /* התמונה תהיה ממורכזת */
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* סגנון לקופסה במרכז */
+        .box {
+            /* צבע לבן חצי שקוף (0.85) - זה הטריק! */
+            background: rgba(255, 255, 255, 0.85);
+
+            padding: 50px;
+            border-radius: 15px;
+            box-shadow: 0 15px 25px rgba(0,0,0,0.2);
+            text-align: center;
+            /* קצת ריווח מהצדדים במסכים קטנים */
+            max-width: 80%;
+        }
+
+        h1 { color: #2c3e50; margin-top: 0;}
+        span { color: #007bff; font-weight: bold; }
+        p { color: #555; font-size: 1.1em; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h1>Hello, <span>Daniel</span>!</h1>
-        <p>This page was generated from a template.</p>
+        <h1>Welcome <span>Daniel</span>!</h1>
+        <p>Final project in Network Communications</p>
     </div>
 </body>
 </html>

@@ -1,0 +1,5 @@
+{
+  "name": "daniel",
+  "port": "8080",
+  "container_name": "nginx_server"
+}
