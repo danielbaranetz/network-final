@@ -5,8 +5,7 @@ DNS_LOCAL_PORT = 5354
 GOOGLE_DNS = ("8.8.8.8", 53)
 BUFFER_SIZE = 1024
 
-LOCAL_RECORDS = {
-    "myagent.local.": "127.0.0.1"
+LOCAL_RECORDS = {"myagent.local.": "127.0.0.1"
 }
 
 
