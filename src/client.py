@@ -21,14 +21,12 @@ def get_user_payload():
 
 
 def run_tcp_client():
-    # 1. הכנת הנתונים
     payload = get_user_payload()
     json_bytes = json.dumps(payload).encode('utf-8')
 
     print(f"\n[Client] Connecting to {SERVER_IP}:{SERVER_PORT}...")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # הוספת Timeout כדי שהלקוח לא ייתקע לנצח אם השרת מוריד דוקר
     sock.settimeout(20)
 
     try:
@@ -38,7 +36,6 @@ def run_tcp_client():
         sock.sendall(json_bytes)
         print(f"[Client] Data sent ({len(json_bytes)} bytes). Waiting for server logic...")
 
-        # הגדלת הבאפר ל-4096 כדי לקבל הודעות ארוכות
         response = sock.recv(4096)
         print(f"\n[Client] Server Response:\n{response.decode()}")
 
