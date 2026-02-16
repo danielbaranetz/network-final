@@ -22,6 +22,7 @@ def set_config():
         return f"ERROR: Could not find config file at: {json_path}"
 
 
+
 if __name__ == "__main__":
     user_input = "Daniel"
     print(set_config())
