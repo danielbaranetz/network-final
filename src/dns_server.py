@@ -1,50 +1,68 @@
 import socket
 
 DNS_LOCAL_IP = "127.0.0.1"
-DNS_LOCAL_PORT = 5354
+DNS_LOCAL_PORT = 5358
 GOOGLE_DNS = ("8.8.8.8", 53)
 BUFFER_SIZE = 1024
 
-LOCAL_RECORDS = {"myagent.local.": "127.0.0.1"}
+# Local address dictionary
+LOCAL_RECORDS = {
+    "myagent.local": "127.0.0.1"
+}
+
+
+def extract_domain_name(data):
+    try:
+        domain = ""
+        i = 12
+        length = data[i]
+        while length != 0:
+            domain += data[i + 1:i + 1 + length].decode() + "."
+            i += length + 1
+            length = data[i]
+        return domain[:-1]
+    except:
+        return "Unknown"
 
 
 def start_dns_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
+    # This line allows the port to be reused immediately after the server stops
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
     try:
         server_socket.bind((DNS_LOCAL_IP, DNS_LOCAL_PORT))
-        print(f"[STATUS] DNS Server started successfully on {DNS_LOCAL_IP}:{DNS_LOCAL_PORT}")
+        print(f"DNS Server is UP on {DNS_LOCAL_IP}:{DNS_LOCAL_PORT}")
     except Exception as e:
-        print(f"[ERROR] Could not start server: {e}")
+        print(f"Error starting server: {e}")
         return
 
     print("[INFO] Waiting for DNS queries...")
 
     while True:
         try:
+            # Receive a request
             data, client_address = server_socket.recvfrom(BUFFER_SIZE)
-            print(f"\n[QUERY] Received request from client at {client_address}")
-            print(f"[DEBUG] Raw data length: {len(data)} bytes")
+            domain_requested = extract_domain_name(data)
 
-            print(f"[FORWARD] Sending query to Google DNS ({GOOGLE_DNS[0]})...")
+            # Checking the local dictionary (for future logic)
+            if domain_requested in LOCAL_RECORDS:
+                pass
 
+            # Contacting Google (Forwarding)
             proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             proxy_socket.settimeout(2.0)
-
             proxy_socket.sendto(data, GOOGLE_DNS)
 
             response, _ = proxy_socket.recvfrom(BUFFER_SIZE)
-            print(f"[RESPONSE] Received answer from Google DNS ({len(response)} bytes)")
 
+            # Returning the answer to the client
             server_socket.sendto(response, client_address)
-            print(f"[DONE] Sent response back to client {client_address}")
-
             proxy_socket.close()
 
-        except socket.timeout:
-            print("[TIMEOUT] Google DNS did not respond within 2 seconds.")
-        except Exception as e:
-            print(f"[ERROR] An unexpected error occurred: {e}")
+        except (socket.timeout, Exception):
+            continue
 
 
 if __name__ == "__main__":
