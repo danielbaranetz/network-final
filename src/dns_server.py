@@ -27,7 +27,6 @@ def extract_domain_name(data):
 
 def start_dns_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
     # This line allows the port to be reused immediately after the server stops
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
