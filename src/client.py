@@ -19,6 +19,24 @@ def get_user_payload():
     return data
 
 
+
+def resolve_dns_locally(domain):
+    try:
+        dns_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        dns_sock.settimeout(2)
+        header = b'\xaa\xaa\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00'
+        query = b'\x07myagent\x05local\x00\x00\x01\x00\x01'
+        dns_sock.sendto(header + query, ("127.0.0.1", 5358))
+        dns_sock.recvfrom(1024)
+        print("[DNS] Domain resolved via local DNS server")
+    except:
+        print("[DNS] DNS server not responding, using default IP")
+    finally:
+        dns_sock.close()
+
+
+
+
 def run_dhcp_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -54,6 +72,7 @@ def run_dhcp_server():
 
 
 def run_tcp_client():
+    resolve_dns_locally("myagent.local")
     payload = get_user_payload()
     json_bytes = json.dumps(payload).encode('utf-8')
 
