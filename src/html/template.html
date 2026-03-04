@@ -4,42 +4,27 @@
     <meta charset="UTF-8">
     <title>Network Agent View</title>
     <style>
-        /* סגנון לכל העמוד */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            /* איפוס שוליים ברירת מחדל */
             margin: 0;
             padding: 0;
-            /* תופס את כל גובה המסך */
             height: 100vh;
-            /* מרכוז הקופסה במרכז המסך */
             display: flex;
             justify-content: center;
             align-items: center;
-
-            /* --- הגדרות הרקע --- */
-            /* שכבה ראשונה: פילטר כהה חצי שקוף (כדי שהטקסט יהיה קריא) */
-            /* שכבה שניה: התמונה עצמה */
             background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
-                              url('bg.jpg'); /* Nginx מחפש את זה באותה תיקייה */
-
-            /* התמונה תכסה את כל המסך בלי עיוות */
+                              url('bg.jpg');
             background-size: cover;
-            /* התמונה תהיה ממורכזת */
             background-position: center;
             background-repeat: no-repeat;
         }
 
-        /* סגנון לקופסה במרכז */
         .box {
-            /* צבע לבן חצי שקוף (0.85) - זה הטריק! */
             background: rgba(255, 255, 255, 0.85);
-
             padding: 50px;
             border-radius: 15px;
             box-shadow: 0 15px 25px rgba(0,0,0,0.2);
             text-align: center;
-            /* קצת ריווח מהצדדים במסכים קטנים */
             max-width: 80%;
         }
 
