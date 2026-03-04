@@ -9,9 +9,10 @@ LISTENING_PORT = 12345
 
 
 def deploy_container_logic(data):
-    user_name = data.get('name', 'Guest')
-    container_name = data.get('container_name', 'nginx_server')
-    website_port = data.get('port', '8080')
+    user_name = data.get('name')
+    container_name = data.get('container_name')
+    website_port = data.get('port')
+    kill_container_on_port(website_port)
 
     print(f"[Server] Processing deployment for: {user_name} on port {website_port}")
 
@@ -97,6 +98,15 @@ def handle_client_connection(client_socket):
         except Exception as e:
             print(f"Handler Error: {e}")
 
+
+def kill_container_on_port(port):
+    find_cmd = ["docker", "ps", "-q", "--filter", f"publish={port}"]
+    result = subprocess.run(find_cmd, capture_output=True, text=True)
+    container_ids = result.stdout.strip().split('\n')
+    for c_id in container_ids:
+        if c_id:
+            print(f"[Server] Cleaning up port {port} (Stopping container {c_id})...")
+            subprocess.run(["docker", "rm", "-f", c_id], capture_output=True)
 
 if __name__ == "__main__":
     start_tcp_server()
