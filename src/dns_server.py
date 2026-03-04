@@ -1,9 +1,5 @@
 import socket
-
-DNS_LOCAL_IP = "127.0.0.1"
-DNS_LOCAL_PORT = 5358
-GOOGLE_DNS = ("8.8.8.8", 53)
-BUFFER_SIZE = 1024
+from constants import *
 
 # Local address dictionary
 LOCAL_RECORDS = {
