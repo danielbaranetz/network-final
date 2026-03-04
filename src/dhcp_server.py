@@ -1,4 +1,4 @@
-import socket, json, time, threading
+import socket, json, time, threading, random
 from constants import *
 
 leases = {}          # client_id -> {"ip": str, "expires": float}
@@ -41,7 +41,7 @@ def get_free_ip():
 
 def handle_discover(msg):
     client_id = msg["client_id"]
-    xid = msg.get["xid"]
+    xid = msg.get("xid")
 
     if not client_id or xid is None:
         return {
@@ -195,8 +195,10 @@ def start_server():
         else:
             resp = {"type": "NAK", "xid": msg.get("xid"), "reason": "UNKNOWN_TYPE"}
 
-        print(
-            f"[DHCP] RX {mtype} from {addr} -> TX {resp.get('type')} xid={resp.get('xid')} client_id={msg.get('client_id')}")
+        print(f"[DHCP] RX {mtype} from {addr} -> TX {resp.get('type')} xid={resp.get('xid')} client_id={msg.get('client_id')}")
+        if resp.get("type") == "ACK" and random.random() < 0.5:
+            print("[TEST] Dropping ACK to simulate loss")
+            continue
         sock.sendto(json.dumps(resp).encode(), addr)
 
 

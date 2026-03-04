@@ -2,25 +2,45 @@ import socket
 import json, random
 import os, uuid
 from constants import *
+import argparse
 
 #CLIENT_ID_FILE = "client_id.txt"
-CLIENT_ID_FILE = os.path.join(os.path.dirname(__file__), "client_id.txt")
+#CLIENT_ID_FILE = os.path.join(os.path.dirname(__file__), "client_id.txt")
 
-def get_or_create_client_id():
-    if os.path.exists(CLIENT_ID_FILE):
-        return open(CLIENT_ID_FILE, "r", encoding="utf-8").read().strip()
+BASE_DIR = os.path.dirname(__file__)
+DEFAULT_CLIENT_NUM = 1
+
+def client_id_path(client_num: int) -> str:
+    return os.path.join(BASE_DIR, f"client_id_{client_num}.txt")
+
+# def get_or_create_client_id():
+#     if os.path.exists(CLIENT_ID_FILE):
+#         return open(CLIENT_ID_FILE, "r", encoding="utf-8").read().strip()
+#
+#     cid = str(uuid.uuid4())
+#     with open(CLIENT_ID_FILE, "w", encoding="utf-8") as f:
+#         f.write(cid)
+#     return cid
+
+def get_or_create_client_id(client_num: int) -> str:
+    path = client_id_path(client_num)
+
+    if os.path.exists(path):
+        return open(path, "r", encoding="utf-8").read().strip()
 
     cid = str(uuid.uuid4())
-    with open(CLIENT_ID_FILE, "w", encoding="utf-8") as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(cid)
     return cid
 
 
-def run_dhcp_server():
+#def run_dhcp_server():
+def run_dhcp_server(client_num: int):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(2.0)
 
-    client_id = get_or_create_client_id()
+    #client_id = get_or_create_client_id()
+    client_id = get_or_create_client_id(client_num)
     xid = random.randint(1, 99999)
 
     discover = {"type": "DISCOVER", "xid": xid, "client_id": client_id}
@@ -58,28 +78,60 @@ def run_dhcp_server():
         "client_id": client_id,
         "requested_ip": offer["offered_ip"]
     }
-    sock.sendto(json.dumps(request).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
 
-    try:
-        data, _ = sock.recvfrom(4096)
-        ack = json.loads(data.decode())
+    ack = None
+    for attempt in range(3):
+        print(f"[DHCP] Sending REQUEST (attempt {attempt + 1}/3)")
+        sock.sendto(json.dumps(request).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
 
-        if ack.get("xid") != xid:
-            print("[DHCP] ACK xid mismatch")
-            return None
+        try:
+            data, _ = sock.recvfrom(4096)
+            msg = json.loads(data.decode())
 
-        if ack.get("type") != "ACK":
-            print("[DHCP] Failed, got:", ack)
-            return None
+            if msg.get("xid") != xid:
+                continue
 
-        print("Received ACK:", ack)
-        return ack
+            if msg.get("type") == "ACK":
+                ack = msg
+                break
 
-    except socket.timeout:
-        print("[DHCP] REQUEST timeout")
+            if msg.get("type") == "NAK":
+                print("[DHCP] Server returned NAK:", msg)
+                return None
+
+        except socket.timeout:
+            print(f"[DHCP] REQUEST timeout (attempt {attempt + 1}/3)")
+
+    if not ack:
+        print("[DHCP] Failed to get ACK")
         return None
-    finally:
-        sock.close()
+
+    print("Received ACK:", ack)
+    return ack
+
+
+    # sock.sendto(json.dumps(request).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
+    #
+    # try:
+    #     data, _ = sock.recvfrom(4096)
+    #     ack = json.loads(data.decode())
+    #
+    #     if ack.get("xid") != xid:
+    #         print("[DHCP] ACK xid mismatch")
+    #         return None
+    #
+    #     if ack.get("type") != "ACK":
+    #         print("[DHCP] Failed, got:", ack)
+    #         return None
+    #
+    #     print("Received ACK:", ack)
+    #     return ack
+
+    # except socket.timeout:
+    #     print("[DHCP] REQUEST timeout")
+    #     return None
+    # finally:
+    #     sock.close()
 
 
 def get_user_payload():
@@ -95,11 +147,13 @@ def get_user_payload():
     }
     return data
 
-def dhcp_release():
+#def dhcp_release():
+def dhcp_release(client_num: int):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(2.0)
 
-    client_id = get_or_create_client_id()
+    #client_id = get_or_create_client_id()
+    client_id = get_or_create_client_id(client_num)
     xid = random.randint(1, 99999)
 
     release = {"type": "RELEASE", "xid": xid, "client_id": client_id}
@@ -147,13 +201,32 @@ def run_tcp_client():
         print("[Client] Connection closed.")
 
 
+# if __name__ == "__main__":
+#     ack = run_dhcp_server()
+#     if not ack:
+#         exit(1)
+#     assigned_ip = ack.get("assigned_ip")
+#     print(f"[Client] My assigned IP: {assigned_ip}")
+#
+#     run_tcp_client()
+#
+#     dhcp_release()
+
 if __name__ == "__main__":
-    ack = run_dhcp_server()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--client", type=int, default=1, help="Client number (e.g., 1,2,3)")
+    args = parser.parse_args()
+
+    client_num = args.client
+    print(f"[Client] Running as client #{client_num}")
+
+    ack = run_dhcp_server(client_num)
     if not ack:
         exit(1)
+
     assigned_ip = ack.get("assigned_ip")
-    print(f"[Client] My assigned IP: {assigned_ip}")
+    print(f"[Client {client_num}] My assigned IP: {assigned_ip}")
 
     run_tcp_client()
 
-    dhcp_release()
+    dhcp_release(client_num)
