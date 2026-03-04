@@ -1,8 +1,85 @@
 import socket
-import json
-import os
-import random
+import json, random
+import os, uuid
 from constants import *
+
+#CLIENT_ID_FILE = "client_id.txt"
+CLIENT_ID_FILE = os.path.join(os.path.dirname(__file__), "client_id.txt")
+
+def get_or_create_client_id():
+    if os.path.exists(CLIENT_ID_FILE):
+        return open(CLIENT_ID_FILE, "r", encoding="utf-8").read().strip()
+
+    cid = str(uuid.uuid4())
+    with open(CLIENT_ID_FILE, "w", encoding="utf-8") as f:
+        f.write(cid)
+    return cid
+
+
+def run_dhcp_server():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2.0)
+
+    client_id = get_or_create_client_id()
+    xid = random.randint(1, 99999)
+
+    discover = {"type": "DISCOVER", "xid": xid, "client_id": client_id}
+
+    offer = None
+    for attempt in range(3):
+        sock.sendto(json.dumps(discover).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
+        try:
+            data, _ = sock.recvfrom(4096)
+            msg = json.loads(data.decode())
+
+            if msg.get("xid") != xid:
+                continue
+
+            if msg.get("type") == "OFFER":
+                offer = msg
+                break
+
+            if msg.get("type") == "NAK":
+                print("DHCP NAK:", msg)
+                return None
+
+        except socket.timeout:
+            print(f"[DHCP] DISCOVER timeout (attempt {attempt+1}/3)")
+
+    if not offer:
+        print("[DHCP] Failed to get OFFER")
+        return None
+
+    print("Received OFFER:", offer)
+
+    request = {
+        "type": "REQUEST",
+        "xid": xid,
+        "client_id": client_id,
+        "requested_ip": offer["offered_ip"]
+    }
+    sock.sendto(json.dumps(request).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
+
+    try:
+        data, _ = sock.recvfrom(4096)
+        ack = json.loads(data.decode())
+
+        if ack.get("xid") != xid:
+            print("[DHCP] ACK xid mismatch")
+            return None
+
+        if ack.get("type") != "ACK":
+            print("[DHCP] Failed, got:", ack)
+            return None
+
+        print("Received ACK:", ack)
+        return ack
+
+    except socket.timeout:
+        print("[DHCP] REQUEST timeout")
+        return None
+    finally:
+        sock.close()
 
 
 def get_user_payload():
@@ -18,39 +95,26 @@ def get_user_payload():
     }
     return data
 
-
-def run_dhcp_server():
+def dhcp_release():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2.0)
 
-    client_id = input("Enter client id: ")
+    client_id = get_or_create_client_id()
     xid = random.randint(1, 99999)
 
-    # DISCOVER
-    discover = {
-        "type": "DISCOVER",
-        "xid": xid,
-        "client_id": client_id
-    }
+    release = {"type": "RELEASE", "xid": xid, "client_id": client_id}
+    sock.sendto(json.dumps(release).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
 
-    sock.sendto(json.dumps(discover).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
-
-    data, _ = sock.recvfrom(4096)
-    offer = json.loads(data.decode())
-    print("Received OFFER:", offer)
-
-    # REQUEST
-    request = {
-        "type": "REQUEST",
-        "xid": xid,
-        "client_id": client_id,
-        "requested_ip": offer["offered_ip"]
-    }
-
-    sock.sendto(json.dumps(request).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
-
-    data, _ = sock.recvfrom(4096)
-    ack = json.loads(data.decode())
-    print("Received ACK:", ack)
+    try:
+        data, _ = sock.recvfrom(4096)
+        resp = json.loads(data.decode())
+        print("Received RELEASE response:", resp)
+        return resp
+    except socket.timeout:
+        print("[DHCP] RELEASE timeout")
+        return None
+    finally:
+        sock.close()
 
 
 def run_tcp_client():
@@ -84,5 +148,12 @@ def run_tcp_client():
 
 
 if __name__ == "__main__":
-    run_dhcp_server()
+    ack = run_dhcp_server()
+    if not ack:
+        exit(1)
+    assigned_ip = ack.get("assigned_ip")
+    print(f"[Client] My assigned IP: {assigned_ip}")
+
     run_tcp_client()
+
+    dhcp_release()

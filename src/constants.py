@@ -9,3 +9,4 @@ DNS_SERVER_IP = "127.0.0.1"
 APP_SERVER_IP = "127.0.0.1"
 SERVER_PORT = 12345
 
+OFFER_TTL = 15  # seconds (pending offer expiration)
