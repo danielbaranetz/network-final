@@ -49,10 +49,6 @@ def resolve_dns_locally(domain):
         dns_sock.close()
 
 
-
-
-def run_dhcp_server():
-
 #def run_dhcp_server():
 def run_dhcp_server(client_num: int):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
