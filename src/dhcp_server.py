@@ -107,7 +107,7 @@ def handle_request(msg):
                 "type": "ACK", "xid": xid,
                 "assigned_ip": requested_ip,
                 "lease_time": LEASE_TIME,
-                "dns_ip": DNS_SERVER_IP,
+                "dns_ip": DNS_LOCAL_IP,
                 "app_server_ip": APP_SERVER_IP
             }
 
@@ -145,7 +145,7 @@ def handle_request(msg):
         "type": "ACK", "xid": xid,
         "assigned_ip": requested_ip,
         "lease_time": LEASE_TIME,
-        "dns_ip": DNS_SERVER_IP,
+        "dns_ip": DNS_LOCAL_IP,
         "app_server_ip": APP_SERVER_IP
     }
 
