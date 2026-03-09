@@ -7,6 +7,15 @@ pending_offers = {}  # (client_id, xid) -> {"ip": str, "expires": float}
 
 lock = threading.Lock()
 
+statistics = {
+    "discover_received": 0,
+    "offer_sent": 0,
+    "request_received": 0,
+    "ack_sent": 0,
+    "nak_sent": 0,
+    "release_received": 0
+}
+
 #------------------------ FUNCTIONS ----------------------------------
 
 def cleanup_loop():
@@ -40,7 +49,7 @@ def get_free_ip():
 
 
 def handle_discover(msg):
-    client_id = msg["client_id"]
+    client_id = msg.get("client_id")
     xid = msg.get("xid")
 
     if not client_id or xid is None:
@@ -62,7 +71,8 @@ def handle_discover(msg):
                 "type": "OFFER",
                 "xid": xid,
                 "offered_ip": ip,
-                "lease_time": LEASE_TIME
+                "lease_time": LEASE_TIME,
+                "server_id": SERVER_ID
             }
 
     ip = get_free_ip()
@@ -80,20 +90,29 @@ def handle_discover(msg):
         "type": "OFFER",
         "xid": xid,
         "offered_ip": ip,
-        "lease_time": LEASE_TIME
+        "lease_time": LEASE_TIME,
+        "server_id": SERVER_ID
     }
 
 
 def handle_request(msg):
     client_id = msg.get("client_id")
     xid = msg.get("xid")
-
+    server_id = msg.get("server_id")
     requested_ip = msg.get("requested_ip")
+
     if not client_id or xid is None or not requested_ip:
         return {
             "type": "NAK",
             "xid": xid,
             "reason": "MISSING_FIELDS"
+        }
+
+    if server_id != SERVER_ID:
+        return {
+            "type": "NAK",
+            "xid": xid,
+            "reason": "WRONG_SERVER_ID"
         }
 
     now = time.time()
@@ -104,11 +123,17 @@ def handle_request(msg):
         if client_id in leases and leases[client_id]["ip"] == requested_ip and leases[client_id]["expires"] > now:
             leases[client_id]["expires"] = now + LEASE_TIME
             return {
-                "type": "ACK", "xid": xid,
+                "type": "ACK",
+                "xid": xid,
                 "assigned_ip": requested_ip,
                 "lease_time": LEASE_TIME,
+                "lease_start_time": int(now),
                 "dns_ip": DNS_LOCAL_IP,
-                "app_server_ip": APP_SERVER_IP
+                "app_server_ip": APP_SERVER_IP,
+                "subnet_mask": SUBNET_MASK,
+                "router": ROUTER_IP,
+                "domain_name": DOMAIN_NAME,
+                "server_id": SERVER_ID
             }
 
         # must have matching pending offer
@@ -142,11 +167,17 @@ def handle_request(msg):
 
     print(f"[LEASE GRANTED] client_id={client_id} ip={requested_ip}")
     return {
-        "type": "ACK", "xid": xid,
+        "type": "ACK",
+        "xid": xid,
         "assigned_ip": requested_ip,
         "lease_time": LEASE_TIME,
+        "lease_start_time": int(now),
         "dns_ip": DNS_LOCAL_IP,
-        "app_server_ip": APP_SERVER_IP
+        "app_server_ip": APP_SERVER_IP,
+        "subnet_mask": SUBNET_MASK,
+        "router": ROUTER_IP,
+        "domain_name": DOMAIN_NAME,
+        "server_id": SERVER_ID
     }
 
 def handle_release(msg):
@@ -172,6 +203,25 @@ def handle_release(msg):
     print(f"[LEASE RELEASED] client_id={client_id} ip={ip}")
     return {"type": "ACK", "xid": xid, "released": True, "released_ip": ip}
 
+def print_statistics_loop():
+    while True:
+        time.sleep(10)
+
+        with lock:
+            active_leases = len(leases)
+            pending_count = len(pending_offers)
+
+            print("\n========== DHCP STATISTICS ==========")
+            print(f"DISCOVER received : {statistics['discover_received']}")
+            print(f"OFFER sent        : {statistics['offer_sent']}")
+            print(f"REQUEST received  : {statistics['request_received']}")
+            print(f"ACK sent          : {statistics['ack_sent']}")
+            print(f"NAK sent          : {statistics['nak_sent']}")
+            print(f"RELEASE received  : {statistics['release_received']}")
+            print(f"Active leases     : {active_leases}")
+            print(f"Pending offers    : {pending_count}")
+            print("========================================\n")
+
 #------------------------ MAIN FUNCTION ---------------------------------------
 def start_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -186,6 +236,14 @@ def start_server():
             continue
 
         mtype = msg.get("type")
+        with lock:
+            if mtype == "DISCOVER":
+                statistics["discover_received"] += 1
+            elif mtype == "REQUEST":
+                statistics["request_received"] += 1
+            elif mtype == "RELEASE":
+                statistics["release_received"] += 1
+
         if mtype == "DISCOVER":
             resp = handle_discover(msg)
         elif mtype == "REQUEST":
@@ -195,14 +253,26 @@ def start_server():
         else:
             resp = {"type": "NAK", "xid": msg.get("xid"), "reason": "UNKNOWN_TYPE"}
 
-        print(f"[DHCP] RX {mtype} from {addr} -> TX {resp.get('type')} xid={resp.get('xid')} client_id={msg.get('client_id')}")
-        if resp.get("type") == "ACK" and random.random() < 0.5:
+        resp_type = resp.get("type")
+
+        with lock:
+            if resp_type == "OFFER":
+                statistics["offer_sent"] += 1
+            elif resp_type == "ACK":
+                statistics["ack_sent"] += 1
+            elif resp_type == "NAK":
+                statistics["nak_sent"] += 1
+
+        print(f"[DHCP] RX {mtype} from {addr} -> TX {resp_type} xid={resp.get('xid')} client_id={msg.get('client_id')}")
+
+        if SIMULATE_ACK_LOSS and resp_type == "ACK" and random.random() < ACK_LOSS_PROBABILITY:
             print("[TEST] Dropping ACK to simulate loss")
             continue
-        sock.sendto(json.dumps(resp).encode(), addr)
 
+        sock.sendto(json.dumps(resp).encode(), addr)
 
 
 if __name__ == "__main__":
     threading.Thread(target=cleanup_loop, daemon=True).start()
+    threading.Thread(target=print_statistics_loop, daemon=True).start()
     start_server()

@@ -1,6 +1,14 @@
 DHCP_SERVER_IP = "127.0.0.1"
 DHCP_SERVER_PORT = 6767
 
+SERVER_ID = "dhcp-server-1"
+SUBNET_MASK = "255.255.255.0"
+ROUTER_IP = "10.0.0.1"
+DOMAIN_NAME = "myagent.local"
+
+SIMULATE_ACK_LOSS = False
+ACK_LOSS_PROBABILITY = 0.5
+
 LEASE_TIME = 120  # seconds
 
 IP_POOL = [f"10.0.0.{i}" for i in range(2, 21)]
