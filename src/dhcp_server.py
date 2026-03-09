@@ -16,7 +16,6 @@ statistics = {
     "release_received": 0
 }
 
-#------------------------ FUNCTIONS ----------------------------------
 
 def cleanup_loop():
     while True:
@@ -205,7 +204,7 @@ def handle_release(msg):
 
 def print_statistics_loop():
     while True:
-        time.sleep(10)
+        time.sleep(20)
 
         with lock:
             active_leases = len(leases)
@@ -222,7 +221,7 @@ def print_statistics_loop():
             print(f"Pending offers    : {pending_count}")
             print("========================================\n")
 
-#------------------------ MAIN FUNCTION ---------------------------------------
+
 def start_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((DHCP_SERVER_IP, DHCP_SERVER_PORT))
