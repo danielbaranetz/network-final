@@ -1,5 +1,3 @@
-
-# Types of msg sent between the client and server
 TYPE_SIN = "SIN"
 TYPE_SIN_ACK = "SIN_ACK"
 TYPE_ACK = "ACK"
