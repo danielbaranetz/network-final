@@ -15,7 +15,6 @@ def client_id_path(client_num: int):
 
 
 def get_or_create_client_id(client_num: int):
-def get_or_create_client_id(client_num: int) -> str:
     path = client_id_path(client_num)
 
     if os.path.exists(path):
@@ -73,8 +72,8 @@ def run_dhcp_server(client_num: int):
                 print(f"[DHCP] DISCOVER timeout (attempt {attempt+1}/3)")
             except ConnectionResetError:
                 print("[DHCP] UDP reset received. Retrying DISCOVER...")
-        except socket.timeout:
-            print(f"[DHCP] DISCOVER timeout (attempt {attempt + 1}/3)")
+            except socket.timeout:
+                print(f"[DHCP] DISCOVER timeout (attempt {attempt + 1}/3)")
 
         if not offer:
             print("[DHCP] Failed to get OFFER")
@@ -89,12 +88,6 @@ def run_dhcp_server(client_num: int):
             "requested_ip": offer["offered_ip"],
             "server_id": offer.get("server_id")
         }
-    request = {
-        "type": "REQUEST",
-        "xid": xid,
-        "client_id": client_id,
-        "requested_ip": offer["offered_ip"]
-    }
 
         ack = None
         for attempt in range(3):
