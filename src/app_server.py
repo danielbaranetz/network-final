@@ -15,6 +15,8 @@ def deploy_container_logic(data):
     user_name = data.get('name')
     container_name = data.get('container_name')
     website_port = data.get('port')
+    protocol = data.get('protocol', 'Unknown')
+    assigned_ip = data.get('assigned_ip')
     kill_container_on_port(website_port)
 
     print(f"[Server] Processing deployment for: {user_name} on port {website_port}")
@@ -28,6 +30,9 @@ def deploy_container_logic(data):
         with open(template_path, "r", encoding="utf-8") as f:
             html_content = f.read()
         final_html = html_content.replace("{{NAME}}", user_name)
+        final_html = final_html.replace("{{ASSIGNED_IP}}", assigned_ip)
+        final_html = final_html.replace("{{PORT}}", str(website_port))
+        final_html = final_html.replace("{{PROTOCOL}}", str(protocol).upper())
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(final_html)
@@ -135,6 +140,10 @@ def start_rudp_server():
     finally:
         server_socket.close()
 
+def get_containers():
+    find_cmd = ["docker", "ps", "-a"]
+    result = subprocess.run(find_cmd, capture_output=True, text=True)
+    print(result.stdout)
 
 def kill_container_on_port(port):
     find_cmd = ["docker", "ps", "-q", "--filter", f"publish={port}"]
@@ -156,3 +165,6 @@ if __name__ == "__main__":
 
     tcp_thread.join()
     rudp_thread.join()
+    get_containers()
+
+

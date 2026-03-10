@@ -125,7 +125,7 @@ def run_dhcp_server(client_num: int):
         sock.close()
 
 
-def get_user_payload():
+def get_user_payload(protocol_used, assigned_ip):
     print("--- Configuration ---")
     name = input("Enter your name: ") or "Student"
     container_port = input("Enter container port (default 8080): ") or "8080"
@@ -134,7 +134,9 @@ def get_user_payload():
     data = {
         "name": name,
         "container_name": container_name,
-        "port": container_port
+        "port": container_port,
+        "protocol": protocol_used,
+        "assigned_ip": assigned_ip,
     }
     return data
 
@@ -161,7 +163,7 @@ def dhcp_release(client_num: int):
         sock.close()
 
 
-# ==================== TCP CLIENT ====================
+# TCP client
 def run_tcp_client(payload):
     json_bytes = json.dumps(payload).encode('utf-8')
 
@@ -191,7 +193,7 @@ def run_tcp_client(payload):
         print("[TCP Client] Connection closed.")
 
 
-# ==================== RUDP CLIENT ====================
+# RUDP client
 def run_rudp_client(payload):
     json_str = json.dumps(payload)
     print(f"\n[RUDP Client] Connecting to {APP_SERVER_IP}:{SERVER_PORT}...")
@@ -213,7 +215,6 @@ def run_rudp_client(payload):
         print("[RUDP Client] Handshake Timeout!")
         return
 
-    # 2. Data Transmission (Sliding Window)
     MAX_SIZE = 50
     chunks = [json_str[i:i + MAX_SIZE] for i in range(0, len(json_str), MAX_SIZE)]
     seq, next_seq, window_size = 0, 0, 3
@@ -259,7 +260,6 @@ def run_rudp_client(payload):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--client", type=int, default=1, help="Client number (e.g., 1,2,3)")
-    # הוספת אפשרות בחירת פרוטוקול
     parser.add_argument("--protocol", type=str, choices=['tcp', 'rudp'], default='tcp',
                         help="Choose transport protocol (tcp or rudp)")
     args = parser.parse_args()
@@ -277,7 +277,7 @@ if __name__ == "__main__":
     print(f"[Client {client_num}] My assigned IP: {assigned_ip}")
 
     resolve_dns_locally("myagent.local")
-    payload = get_user_payload()
+    payload = get_user_payload(protocol, assigned_ip)
 
 
     if protocol == 'tcp':
