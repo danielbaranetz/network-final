@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>השרת של {{NAME}}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            animation: fadeIn 1.5s ease-out;
+        }
+        h1 { font-size: 3rem; margin-bottom: 0.5rem; }
+        p { font-size: 1.2rem; opacity: 0.9; }
+        .status {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #4cd137;
+            border-radius: 50px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .info {
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #dcdde1;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>שלום, {{NAME}}! 👋</h1>
+        <p>הקונטיינר שלך הוקם בהצלחה באמצעות המערכת שבנית.</p>
+        <div class="status">מצב: מחובר ופעיל (Online)</div>
+        <div class="info">
+            <p>שרת Nginx מוגש מתוך Docker</p>
+            <p>פרוטוקול תקשורת: TCP/RUDP & DNS</p>
+        </div>
+    </div>
+</body>
+</html>
