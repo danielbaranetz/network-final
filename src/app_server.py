@@ -3,6 +3,9 @@ import json
 import subprocess
 import os
 import shutil
+import threading
+from rudp_func import recv_rudp_msg, send_rudp_msg
+from message_types import *
 
 LISTENING_IP = '0.0.0.0'
 LISTENING_PORT = 12345
@@ -63,19 +66,16 @@ def deploy_container_logic(data):
 def start_tcp_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
     try:
         server_socket.bind((LISTENING_IP, LISTENING_PORT))
         server_socket.listen(5)
-        print(f"[*] Server listening on {LISTENING_IP}:{LISTENING_PORT}...")
-
+        print(f"[TCP] Server listening on {LISTENING_IP}:{LISTENING_PORT}...")
         while True:
             client_socket, addr = server_socket.accept()
-            print(f"[+] Connection from {addr}")
+            print(f"[TCP] Connection from {addr}")
             handle_client_connection(client_socket)
-
     except Exception as e:
-        print(f"[!] Server Error: {e}")
+        print(f"[TCP] Server Error: {e}")
     finally:
         server_socket.close()
 
@@ -84,19 +84,56 @@ def handle_client_connection(client_socket):
     with client_socket:
         try:
             data = client_socket.recv(4096)
-            if not data:
-                return
-
+            if not data: return
             json_str = data.decode('utf-8')
             payload = json.loads(json_str)
             response = deploy_container_logic(payload)
             client_socket.sendall(response.encode('utf-8'))
-            print("[Server] Response sent to client.")
-
-        except json.JSONDecodeError:
-            client_socket.sendall(b"ERROR: Invalid JSON format.")
+            print("[TCP] Response sent to client.")
         except Exception as e:
-            print(f"Handler Error: {e}")
+            print(f"[TCP] Handler Error: {e}")
+
+
+def start_rudp_server():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        server_socket.bind((LISTENING_IP, LISTENING_PORT))
+        print(f"[RUDP] Server listening on {LISTENING_IP}:{LISTENING_PORT}...")
+        expected_seq = 0
+        buffer = []
+        while True:
+            msg, addr = recv_rudp_msg(server_socket)
+            if not msg: continue
+            msg_type = msg.get("type")
+
+            if msg_type == TYPE_SIN:
+                print(f"[RUDP] Handshake initiated by {addr}")
+                send_rudp_msg(server_socket, {"type": TYPE_SIN_ACK}, addr)
+                expected_seq = 0
+                buffer = []
+            elif msg_type == TYPE_ACK:
+                pass # Handshake complete
+            elif msg_type == TYPE_DATA:
+                seq = msg.get("seq")
+                if seq == expected_seq:
+                    buffer.append(msg["payload"])
+                    expected_seq += 1
+                send_rudp_msg(server_socket, {"type": TYPE_ACK, "ack": expected_seq - 1}, addr)
+            elif msg_type == TYPE_END_MESSAGE:
+                full_json_str = "".join(buffer)
+                print(f"[RUDP] Full payload received.")
+                try:
+                    payload = json.loads(full_json_str)
+                    response_text = deploy_container_logic(payload)
+                    send_rudp_msg(server_socket, {"type": "SERVER_RESPONSE", "payload": response_text}, addr)
+                except Exception as e:
+                    send_rudp_msg(server_socket, {"type": "SERVER_RESPONSE", "payload": f"ERROR: {e}"}, addr)
+                expected_seq = 0
+                buffer = []
+    except Exception as e:
+        print(f"[RUDP] Server Error: {e}")
+    finally:
+        server_socket.close()
 
 
 def kill_container_on_port(port):
@@ -109,4 +146,13 @@ def kill_container_on_port(port):
             subprocess.run(["docker", "rm", "-f", c_id], capture_output=True)
 
 if __name__ == "__main__":
-    start_tcp_server()
+    print("Starting Application Server...")
+
+    tcp_thread = threading.Thread(target=start_tcp_server, daemon=True)
+    rudp_thread = threading.Thread(target=start_rudp_server, daemon=True)
+
+    tcp_thread.start()
+    rudp_thread.start()
+
+    tcp_thread.join()
+    rudp_thread.join()

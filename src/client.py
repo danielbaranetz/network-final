@@ -1,28 +1,20 @@
 import socket
-import json, random
+import json, random, time
 import os, uuid
 from constants import *
 import argparse
-
-#CLIENT_ID_FILE = "client_id.txt"
-#CLIENT_ID_FILE = os.path.join(os.path.dirname(__file__), "client_id.txt")
+from rudp_func import send_rudp_msg, recv_rudp_msg
+from message_types import *
 
 BASE_DIR = os.path.dirname(__file__)
 DEFAULT_CLIENT_NUM = 1
 
-def client_id_path(client_num: int) -> str:
+
+def client_id_path(client_num: int):
     return os.path.join(BASE_DIR, f"client_id_{client_num}.txt")
 
-# def get_or_create_client_id():
-#     if os.path.exists(CLIENT_ID_FILE):
-#         return open(CLIENT_ID_FILE, "r", encoding="utf-8").read().strip()
-#
-#     cid = str(uuid.uuid4())
-#     with open(CLIENT_ID_FILE, "w", encoding="utf-8") as f:
-#         f.write(cid)
-#     return cid
 
-def get_or_create_client_id(client_num: int) -> str:
+def get_or_create_client_id(client_num: int):
     path = client_id_path(client_num)
 
     if os.path.exists(path):
@@ -53,7 +45,6 @@ def run_dhcp_server(client_num: int):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(2.0)
 
-    #client_id = get_or_create_client_id()
     client_id = get_or_create_client_id(client_num)
     xid = random.randint(1, 99999)
 
@@ -78,7 +69,7 @@ def run_dhcp_server(client_num: int):
                 return None
 
         except socket.timeout:
-            print(f"[DHCP] DISCOVER timeout (attempt {attempt+1}/3)")
+            print(f"[DHCP] DISCOVER timeout (attempt {attempt + 1}/3)")
 
     if not offer:
         print("[DHCP] Failed to get OFFER")
@@ -86,7 +77,6 @@ def run_dhcp_server(client_num: int):
 
     print("Received OFFER:", offer)
 
-    # REQUEST
     request = {
         "type": "REQUEST",
         "xid": xid,
@@ -125,30 +115,6 @@ def run_dhcp_server(client_num: int):
     return ack
 
 
-    # sock.sendto(json.dumps(request).encode(), (DHCP_SERVER_IP, DHCP_SERVER_PORT))
-    #
-    # try:
-    #     data, _ = sock.recvfrom(4096)
-    #     ack = json.loads(data.decode())
-    #
-    #     if ack.get("xid") != xid:
-    #         print("[DHCP] ACK xid mismatch")
-    #         return None
-    #
-    #     if ack.get("type") != "ACK":
-    #         print("[DHCP] Failed, got:", ack)
-    #         return None
-    #
-    #     print("Received ACK:", ack)
-    #     return ack
-
-    # except socket.timeout:
-    #     print("[DHCP] REQUEST timeout")
-    #     return None
-    # finally:
-    #     sock.close()
-
-
 def get_user_payload():
     print("--- Configuration ---")
     name = input("Enter your name: ") or "Student"
@@ -162,12 +128,11 @@ def get_user_payload():
     }
     return data
 
-#def dhcp_release():
+
 def dhcp_release(client_num: int):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(2.0)
 
-    #client_id = get_or_create_client_id()
     client_id = get_or_create_client_id(client_num)
     xid = random.randint(1, 99999)
 
@@ -186,55 +151,113 @@ def dhcp_release(client_num: int):
         sock.close()
 
 
-def run_tcp_client():
-    resolve_dns_locally("myagent.local")
-    payload = get_user_payload()
+# ==================== TCP CLIENT ====================
+def run_tcp_client(payload):
     json_bytes = json.dumps(payload).encode('utf-8')
 
-    print(f"\n[Client] Connecting to {APP_SERVER_IP}:{SERVER_PORT}...")
+    print(f"\n[TCP Client] Connecting to {APP_SERVER_IP}:{SERVER_PORT}...")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(20)
 
     try:
         sock.connect((APP_SERVER_IP, SERVER_PORT))
-        print("[Client] Connected successfully!")
+        print("[TCP Client] Connected successfully!")
 
         sock.sendall(json_bytes)
-        print(f"[Client] Data sent ({len(json_bytes)} bytes). Waiting for server logic...")
+        print(f"[TCP Client] Data sent ({len(json_bytes)} bytes). Waiting for server logic...")
 
         response = sock.recv(4096)
-        print(f"\n[Client] Server Response:\n{response.decode()}")
+        print(f"\n[TCP Client] Server Response:\n{response.decode()}")
 
     except socket.timeout:
         print("\n[ERROR] Timeout! Server is taking too long (maybe downloading Docker image?).")
     except ConnectionRefusedError:
-        print(f"[Client] Error: Could not connect to {APP_SERVER_IP}:{SERVER_PORT}. Is the server running?")
+        print(f"[TCP Client] Error: Could not connect to {APP_SERVER_IP}:{SERVER_PORT}. Is the server running?")
     except Exception as e:
-        print(f"[Client] Error: {e}")
+        print(f"[TCP Client] Error: {e}")
     finally:
         sock.close()
-        print("[Client] Connection closed.")
+        print("[TCP Client] Connection closed.")
 
 
-# if __name__ == "__main__":
-#     ack = run_dhcp_server()
-#     if not ack:
-#         exit(1)
-#     assigned_ip = ack.get("assigned_ip")
-#     print(f"[Client] My assigned IP: {assigned_ip}")
-#
-#     run_tcp_client()
-#
-#     dhcp_release()
+# ==================== RUDP CLIENT ====================
+def run_rudp_client(payload):
+    json_str = json.dumps(payload)
+    print(f"\n[RUDP Client] Connecting to {APP_SERVER_IP}:{SERVER_PORT}...")
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2.0)
+    server_addr = (APP_SERVER_IP, SERVER_PORT)
+
+    # 1. Handshake
+    send_rudp_msg(sock, {"type": TYPE_SIN}, server_addr)
+    try:
+        res, _ = recv_rudp_msg(sock)
+        if not res or res.get("type") != TYPE_SIN_ACK:
+            print("[RUDP Client] Handshake Failed!")
+            return
+        send_rudp_msg(sock, {"type": TYPE_ACK}, server_addr)
+        print("[RUDP Client] Handshake Succeeded!")
+    except socket.timeout:
+        print("[RUDP Client] Handshake Timeout!")
+        return
+
+    # 2. Data Transmission (Sliding Window)
+    MAX_SIZE = 50
+    chunks = [json_str[i:i + MAX_SIZE] for i in range(0, len(json_str), MAX_SIZE)]
+    seq, next_seq, window_size = 0, 0, 3
+    send_times = {}
+
+    while seq < len(chunks):
+        while next_seq < len(chunks) and next_seq < seq + window_size:
+            send_rudp_msg(sock, {"type": TYPE_DATA, "seq": next_seq, "payload": chunks[next_seq]}, server_addr)
+            send_times[next_seq] = time.time()
+            next_seq += 1
+
+        if seq in send_times and (time.time() - send_times[seq] > 1.0):
+            window_size = max(1, window_size - 1)
+            next_seq = seq
+            send_times.clear()
+            continue
+
+        try:
+            ack_msg, _ = recv_rudp_msg(sock)
+            if ack_msg and ack_msg.get("type") == TYPE_ACK:
+                ack_num = ack_msg["ack"]
+                if ack_num >= seq:
+                    for s in range(seq, ack_num + 1):
+                        send_times.pop(s, None)
+                    seq = ack_num + 1
+                    window_size += 1
+        except socket.timeout:
+            pass
+
+    send_rudp_msg(sock, {"type": TYPE_END_MESSAGE}, server_addr)
+    sock.settimeout(20.0)
+
+    try:
+        response_msg, _ = recv_rudp_msg(sock)
+        if response_msg:
+            print(f"\n[RUDP Client] Server Response:\n{response_msg.get('payload', '')}")
+    except socket.timeout:
+        print("[RUDP Client] Timeout waiting for server response.")
+    finally:
+        sock.close()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--client", type=int, default=1, help="Client number (e.g., 1,2,3)")
+    # הוספת אפשרות בחירת פרוטוקול
+    parser.add_argument("--protocol", type=str, choices=['tcp', 'rudp'], default='tcp',
+                        help="Choose transport protocol (tcp or rudp)")
     args = parser.parse_args()
 
     client_num = args.client
-    print(f"[Client] Running as client #{client_num}")
+    protocol = args.protocol
+
+    print(f"[Client] Running as client #{client_num} using {protocol.upper()}")
 
     ack = run_dhcp_server(client_num)
     if not ack:
@@ -243,6 +266,13 @@ if __name__ == "__main__":
     assigned_ip = ack.get("assigned_ip")
     print(f"[Client {client_num}] My assigned IP: {assigned_ip}")
 
-    run_tcp_client()
+    resolve_dns_locally("myagent.local")
+    payload = get_user_payload()
+
+
+    if protocol == 'tcp':
+        run_tcp_client(payload)
+    else:
+        run_rudp_client(payload)
 
     dhcp_release(client_num)
