@@ -1,8 +1,10 @@
+import signal
 import socket
 import json
 import subprocess
 import os
 import shutil
+import sys
 import threading
 from rudp_func import recv_rudp_msg, send_rudp_msg
 from message_types import *
@@ -19,6 +21,10 @@ def deploy_container_logic(data):
     assigned_ip = data.get('assigned_ip')
     kill_container_on_port(website_port)
 
+    client_number = assigned_ip.split('.')[-1]
+    container_name_suff = container_name + "_" + str(client_number)
+    kill_container_by_name(container_name_suff)
+
     print(f"[Server] Processing deployment for: {user_name} on port {website_port}")
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -33,6 +39,8 @@ def deploy_container_logic(data):
         final_html = final_html.replace("{{ASSIGNED_IP}}", assigned_ip)
         final_html = final_html.replace("{{PORT}}", str(website_port))
         final_html = final_html.replace("{{PROTOCOL}}", str(protocol).upper())
+        final_html = final_html.replace("{{CONTAINER_NAME}}", container_name_suff)
+
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(final_html)
@@ -47,18 +55,17 @@ def deploy_container_logic(data):
 
     html_folder = os.path.dirname(output_path)
 
-    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
-
     cmd = [
         "docker", "run", "-d",
         "-p", f"{website_port}:80",
         "--rm",
-        "--name", container_name,
+        "--name", container_name_suff,
+        "--label", "managed_by=my_python_server",
         "-v", f"{html_folder}:/usr/share/nginx/html",
         "nginx"
     ]
 
-    print(f"[Server] Running Docker container '{container_name}'...")
+    print(f"[Server] Running Docker container '{container_name_suff}'...")
     try:
         result = subprocess.run(cmd, check=True, capture_output=True)
         container_id = result.stdout.decode().strip()[:12]
@@ -151,6 +158,23 @@ def kill_container_on_port(port):
         if c_id:
             print(f"[Server] Cleaning up port {port} (Stopping container {c_id})...")
             subprocess.run(["docker", "rm", "-f", c_id], capture_output=True)
+    for c_id in container_ids:
+        if c_id:
+            print(f" -> Removing container {c_id[:12]}...")
+            subprocess.run(["docker", "rm", "-f", c_id], capture_output=True)
+
+    print("[Server] Cleanup complete. Goodbye! 👋")
+
+def kill_container_by_name(container_name):
+    find_cmd = ["docker", "ps", "-a", "-q", "--filter", f"name=^{container_name}$"]
+    result = subprocess.run(find_cmd, capture_output=True, text=True)
+    container_ids = result.stdout.strip().split('\n')
+
+    for c_id in container_ids:
+        if c_id:
+            print(f"[Server] Cleaning up container name '{container_name}' (Stopping container {c_id[:12]})...")
+            subprocess.run(["docker", "rm", "-f", c_id], capture_output=True)
+
 
 if __name__ == "__main__":
     print("Starting Application Server...")
@@ -163,5 +187,4 @@ if __name__ == "__main__":
 
     tcp_thread.join()
     rudp_thread.join()
-
 
