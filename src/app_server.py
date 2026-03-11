@@ -140,10 +140,8 @@ def start_rudp_server():
     finally:
         server_socket.close()
 
-def get_containers():
-    find_cmd = ["docker", "ps", "-a"]
-    result = subprocess.run(find_cmd, capture_output=True, text=True)
-    print(result.stdout)
+
+
 
 def kill_container_on_port(port):
     find_cmd = ["docker", "ps", "-q", "--filter", f"publish={port}"]
@@ -165,6 +163,5 @@ if __name__ == "__main__":
 
     tcp_thread.join()
     rudp_thread.join()
-    get_containers()
 
 
