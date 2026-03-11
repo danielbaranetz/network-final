@@ -4,7 +4,8 @@ from constants import *
 leases = {}          # client_id -> {"ip": str, "expires": float}
 ip_in_use = {}       # ip -> client_id
 pending_offers = {}  # (client_id, xid) -> {"ip": str, "expires": float}
-
+last_ip_by_client = {}   # client_id -> last assigned ip
+next_ip_index = 0
 lock = threading.Lock()
 
 statistics = {
@@ -39,11 +40,20 @@ def cleanup_loop():
         time.sleep(2)
 
 def get_free_ip():
+    global next_ip_index
+
     with lock:
         offered_ips = {d["ip"] for d in pending_offers.values()}
-        for ip in IP_POOL:
+        pool_size = len(IP_POOL)
+
+        for i in range(pool_size):
+            index = (next_ip_index + i) % pool_size
+            ip = IP_POOL[index]
+
             if ip not in ip_in_use and ip not in offered_ips:
+                next_ip_index = (index + 1) % pool_size
                 return ip
+
     return None
 
 
@@ -65,7 +75,6 @@ def handle_discover(msg):
         if client_id in leases and leases[client_id]["expires"] > now:
             ip = leases[client_id]["ip"]
             pending_offers[(client_id, xid)] = {"ip": ip, "expires": now + OFFER_TTL}
-
             return {
                 "type": "OFFER",
                 "xid": xid,
@@ -73,6 +82,20 @@ def handle_discover(msg):
                 "lease_time": LEASE_TIME,
                 "server_id": SERVER_ID
             }
+
+        # no active lease, but client had an old IP -> try to reuse it if free
+        old_ip = last_ip_by_client.get(client_id)
+        if old_ip and old_ip not in ip_in_use:
+            offered_ips = {d["ip"] for d in pending_offers.values()}
+            if old_ip not in offered_ips:
+                pending_offers[(client_id, xid)] = {"ip": old_ip, "expires": now + OFFER_TTL}
+                return {
+                    "type": "OFFER",
+                    "xid": xid,
+                    "offered_ip": old_ip,
+                    "lease_time": LEASE_TIME,
+                    "server_id": SERVER_ID
+                }
 
     ip = get_free_ip()
     if not ip:
@@ -162,6 +185,7 @@ def handle_request(msg):
         # commit lease
         leases[client_id] = {"ip": requested_ip, "expires": now + LEASE_TIME}
         ip_in_use[requested_ip] = client_id
+        last_ip_by_client[client_id] = requested_ip
         pending_offers.pop(key, None)
 
     print(f"[LEASE GRANTED] client_id={client_id} ip={requested_ip}")

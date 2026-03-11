@@ -8,10 +8,12 @@ from message_types import *
 
 
 BASE_DIR = os.path.dirname(__file__)
+CLIENT_IDS_DIR = os.path.join(BASE_DIR, "client_ids")
+os.makedirs(CLIENT_IDS_DIR, exist_ok=True)
 
 
 def client_id_path(client_num: int):
-    return os.path.join(BASE_DIR, f"client_id_{client_num}.txt")
+    return os.path.join(CLIENT_IDS_DIR, f"client_id_{client_num}.txt")
 
 
 def get_or_create_client_id(client_num: int):
