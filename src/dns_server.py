@@ -21,6 +21,13 @@ def extract_domain_name(data):
         return "Unknown"
 
 
+def build_dns_response(request_data, ip):
+    header = request_data[:2] + b'\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00'
+    question = request_data[12:]
+    answer = b'\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04' + socket.inet_aton(ip)
+
+    return header + question + answer
+
 def start_dns_server():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     # This line allows the port to be reused immediately after the server stops
@@ -43,7 +50,8 @@ def start_dns_server():
 
             # Checking the local dictionary (for future logic)
             if domain_requested in LOCAL_RECORDS:
-                pass
+                server_socket.sendto(build_dns_response(data, LOCAL_RECORDS[domain_requested]), client_address)
+                continue
 
             # Contacting Google (Forwarding)
             proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
