@@ -50,7 +50,6 @@ network-final/
     ├── dhcp_server.py        # DHCP Server implementation
     ├── dns_server.py         # Local DNS Server implementation
     ├── message_types.py      # RUDP message type definitions
-    ├── README.md             # Source-level documentation
     └── rudp_func.py          # Helper functions for the RUDP protocol
 ```
 
