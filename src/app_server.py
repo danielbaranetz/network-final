@@ -1,10 +1,8 @@
-import signal
 import socket
 import json
 import subprocess
 import os
 import shutil
-import sys
 import threading
 from rudp_func import recv_rudp_msg, send_rudp_msg
 from message_types import *
